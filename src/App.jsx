@@ -7,6 +7,8 @@ export const App = () => {
   const [token, setToken] = useState('');
   const [playlists, setPlaylists] = useState([]);
   const [player, setPlayer] = useState(undefined);
+  const [device, setDevice] = useState(undefined);
+  const [devices, setDevices] = useState([]);
 
   useEffect(()  => {
     const authToken = Buffer.from(`${SPOTIFY_CLIENT_ID}:${SPOTIFY_CLIENT_SECRET}`).toString('base64');
@@ -52,16 +54,71 @@ export const App = () => {
       });
   }, [token]);
 
-  const play = useCallback(() => {
-    console.log('player', player);
-    //player.connect();
-    //player.togglePlay();
-  }, [player]);
+  useEffect(() => {
+    if (!token) {
+      return;
+    }
+    const header = {
+      Accept: 'application/json',
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`,
+    };
+
+    axios
+      .get('https://api.spotify.com/v1/me/player/devices', { headers: header })
+      .then(result => {
+        console.log('player res', result.data.devices);
+        setDevices(result.data.devices);
+      })
+      .catch(error => {
+        console.error(error);
+      });
+  }, [token]);
+
+  const selectDevice = useCallback((idx) => {
+    setDevice(devices[idx]);
+  }, [devices]);
+
+  const play = useCallback((uri) => {
+    if (!token || !device) {
+      return;
+    }
+    const header = {
+      Accept: 'application/json',
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`,
+    };
+
+    axios
+      .put(`https://api.spotify.com/v1/me/player/play?device_id=${device.id}`, {uris: [uri]}, { headers: header })
+      .then(result => {
+        console.log('player res', result);
+      })
+      .catch(error => {
+        console.error(error);
+      });
+  }, [token, device]);
 
   return (
     <>
-      <div className="text-3xl font-bold underline">hello world</div>
-      <div>playlist name: {playlists.name}</div>
+      <h1 className="text-3xl font-bold underline">hello world</h1>
+      <h2 className="mt-32 text-xl font-bold">device</h2>
+      <div className="flex space-x-16">
+        {devices.map((d,key) => (
+          <div
+            className="border"
+            key={d.id}
+            onClick={() => selectDevice(key)}
+          >
+            <div>{d.name}</div>
+            <div>{d.type}</div>
+            {d.id === device?.id && (
+              <div className="text-red-600">selected</div>
+            )}
+          </div>
+        ))}
+      </div>
+      <h2 className="mt-32 text-xl font-bold">playlist name: {playlists.name}</h2>
       {playlists?.tracks?.items?.map(item => (
         <div
           className="w-full max-w-screen-sm flex justify-between items-center border"
@@ -78,7 +135,7 @@ export const App = () => {
           </div>
           <div
             className="w-40 h-40 rounded-full bg-gray-500 border"
-            onClick={play}
+            onClick={() => play(item.track.uri)}
           >ボタン</div>
         </div>
       ))} 
